@@ -34,20 +34,32 @@ export async function processBashCommand(inputString: string, precedingInputBloc
     })
   });
 
-  // ctrl+b to background indicator
-  let jsx: React.ReactNode;
+  // ctrl+b to background indicator and tool progress state
+  let currentProgress: ShellProgress | null = null;
+  let currentToolJSXArgs: Parameters<SetToolJSXFn>[0] = null;
+
+  const updateUI = () => {
+    setToolJSX({
+      ...currentToolJSXArgs,
+      jsx: (
+        <>
+          <BashModeProgress input={inputString} progress={currentProgress} verbose={context.options.verbose} />
+          {currentToolJSXArgs?.jsx}
+        </>
+      ),
+      shouldHidePromptInput: false,
+    });
+  };
 
   // Just show initial UI
-  setToolJSX({
-    jsx: <BashModeProgress input={inputString} progress={null} verbose={context.options.verbose} />,
-    shouldHidePromptInput: false
-  });
+  updateUI();
+
   try {
     const bashModeContext: ProcessUserInputContext = {
       ...context,
-      // TODO: Clean up this hack
       setToolJSX: _ => {
-        jsx = _?.jsx;
+        currentToolJSXArgs = _;
+        updateUI();
       }
     };
 
@@ -55,14 +67,8 @@ export async function processBashCommand(inputString: string, precedingInputBloc
     const onProgress = (progress: {
       data: ShellProgress;
     }) => {
-      setToolJSX({
-        jsx: <>
-            <BashModeProgress input={inputString!} progress={progress.data} verbose={context.options.verbose} />
-            {jsx}
-          </>,
-        shouldHidePromptInput: false,
-        showSpinner: false
-      });
+      currentProgress = progress.data;
+      updateUI();
     };
 
     // User-initiated `!` commands run outside sandbox. Both shell tools honor

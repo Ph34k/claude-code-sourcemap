@@ -69,6 +69,7 @@ import {
   type ProcessUserInputContext,
   processUserInput,
 } from './utils/processUserInput/processUserInput.js'
+import { toExternalPermissionMode } from './utils/permissions/PermissionMode.js'
 import { fetchSystemPromptParts } from './utils/queryContext.js'
 import { setCwd } from './utils/Shell.js'
 import {
@@ -541,8 +542,9 @@ export class QueryEngine {
       tools,
       mcpClients,
       model: mainLoopModel,
-      permissionMode: initialAppState.toolPermissionContext
-        .mode as PermissionMode, // TODO: avoid the cast
+      permissionMode: toExternalPermissionMode(
+        initialAppState.toolPermissionContext.mode,
+      ),
       commands,
       agents,
       skills,

@@ -22,6 +22,7 @@ import { feature } from 'bun:bundle';
 import { Command as CommanderCommand, InvalidArgumentError, Option } from '@commander-js/extra-typings';
 import chalk from 'chalk';
 import { readFileSync } from 'fs';
+import { readFile } from 'fs/promises';
 import mapValues from 'lodash-es/mapValues.js';
 import pickBy from 'lodash-es/pickBy.js';
 import uniqBy from 'lodash-es/uniqBy.js';
@@ -1348,7 +1349,7 @@ async function run(): Promise<CommanderCommand> {
       }
       try {
         const filePath = resolve(options.systemPromptFile);
-        systemPrompt = readFileSync(filePath, 'utf8');
+        systemPrompt = await readFile(filePath, 'utf8');
       } catch (error) {
         const code = getErrnoCode(error);
         if (code === 'ENOENT') {
@@ -1369,7 +1370,7 @@ async function run(): Promise<CommanderCommand> {
       }
       try {
         const filePath = resolve(options.appendSystemPromptFile);
-        appendSystemPrompt = readFileSync(filePath, 'utf8');
+        appendSystemPrompt = await readFile(filePath, 'utf8');
       } catch (error) {
         const code = getErrnoCode(error);
         if (code === 'ENOENT') {

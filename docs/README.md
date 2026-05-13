@@ -17,6 +17,8 @@ Claude Code can understand your codebase, edit files, run terminal commands, and
 - [API Reference](./api/README.md)
   - [Commands API](./api/commands.md)
   - [Tools API](./api/tools.md)
+  - [Tasks API](./api/tasks.md)
+  - [Context API](./api/context.md)
 - [Available Tools](./tools/built-in.md)
 - [Model Context Protocol (MCP)](./mcp/README.md)
 

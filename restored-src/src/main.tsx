@@ -22,6 +22,7 @@ import { feature } from 'bun:bundle';
 import { Command as CommanderCommand, InvalidArgumentError, Option } from '@commander-js/extra-typings';
 import chalk from 'chalk';
 import { readFileSync } from 'fs';
+import { readFile } from 'fs/promises';
 import mapValues from 'lodash-es/mapValues.js';
 import pickBy from 'lodash-es/pickBy.js';
 import uniqBy from 'lodash-es/uniqBy.js';
@@ -429,7 +430,7 @@ export function startDeferredPrefetches(): void {
     void import('./utils/eventLoopStallDetector.js').then(m => m.startEventLoopStallDetector());
   }
 }
-function loadSettingsFromFlag(settingsFile: string): void {
+async function loadSettingsFromFlag(settingsFile: string): Promise<void> {
   try {
     const trimmedSettings = settingsFile.trim();
     const looksLikeJson = trimmedSettings.startsWith('{') && trimmedSettings.endsWith('}');
@@ -461,7 +462,7 @@ function loadSettingsFromFlag(settingsFile: string): void {
         resolvedPath: resolvedSettingsPath
       } = safeResolvePath(getFsImplementation(), settingsFile);
       try {
-        readFileSync(resolvedSettingsPath, 'utf8');
+        await readFile(resolvedSettingsPath, 'utf8');
       } catch (e) {
         if (isENOENT(e)) {
           process.stderr.write(chalk.red(`Error: Settings file not found: ${resolvedSettingsPath}\n`));
@@ -499,12 +500,12 @@ function loadSettingSourcesFromFlag(settingSourcesArg: string): void {
  * Parse and load settings flags early, before init()
  * This ensures settings are filtered from the start of initialization
  */
-function eagerLoadSettings(): void {
+async function eagerLoadSettings(): Promise<void> {
   profileCheckpoint('eagerLoadSettings_start');
   // Parse --settings flag early to ensure settings are loaded before init()
   const settingsFile = eagerParseCliFlag('--settings');
   if (settingsFile) {
-    loadSettingsFromFlag(settingsFile);
+    await loadSettingsFromFlag(settingsFile);
   }
 
   // Parse --setting-sources flag early to control which sources are loaded
@@ -849,7 +850,7 @@ export async function main() {
   profileCheckpoint('main_client_type_determined');
 
   // Parse and load settings flags early, before init()
-  eagerLoadSettings();
+  await eagerLoadSettings();
   profileCheckpoint('main_before_run');
   await run();
   profileCheckpoint('main_after_run');

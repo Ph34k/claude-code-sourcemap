@@ -1,5 +1,5 @@
 import chalk from 'chalk'
-import { exec } from 'child_process'
+import { exec, execFile } from 'child_process'
 import { execa } from 'execa'
 import { mkdir, stat } from 'fs/promises'
 import memoize from 'lodash-es/memoize.js'
@@ -74,6 +74,7 @@ import {
   getSettingsForSource,
 } from './settings/settings.js'
 import { sleep } from './sleep.js'
+import { parseArguments } from './argumentSubstitution.js'
 import { jsonParse } from './slowOperations.js'
 import { clearToolSchemaCache } from './toolSchemaCache.js'
 
@@ -922,8 +923,17 @@ export function refreshGcpAuth(gcpAuthRefresh: string): Promise<boolean> {
   authStatusManager.startAuthentication()
 
   return new Promise(resolve => {
-    const refreshProc = exec(gcpAuthRefresh, {
+    const parsedCommand = parseArguments(gcpAuthRefresh)
+    if (!parsedCommand || parsedCommand.length === 0) {
+      logForDebugging('gcpAuthRefresh evaluated to empty command', { level: 'error' })
+      authStatusManager.endAuthentication(false)
+      return resolve(false)
+    }
+
+    const [command, ...args] = parsedCommand
+    const refreshProc = execFile(command, args, {
       timeout: GCP_AUTH_REFRESH_TIMEOUT_MS,
+      shell: false,
     })
     refreshProc.stdout!.on('data', data => {
       const output = data.toString().trim()

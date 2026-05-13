@@ -27,7 +27,7 @@ export default defineConfig({
           { text: 'Tasks API', link: '/api/tasks' },
           { text: 'Context API', link: '/api/context' }
         ]
-      },
+      }, 
       {
         text: 'Tools',
         items: [

@@ -27,6 +27,24 @@ Commands can be:
 - **Local Commands:** Executed directly by the Node/Bun environment (e.g., `/clear`, `/cost`, `/config`).
 - **Local JSX Commands:** Commands that render complex interactive UI components using Ink (a React renderer for terminals).
 
+## The Agent Swarm Coordinator
+
+In `src/coordinator/`, the system defines the rules for how Agents interact. When a user requests a complex task, the primary Agent can use the `AgentTool` to spawn a "Teammate".
+
+1. **Isolation:** Each Teammate gets its own isolated prompt loop, system context, and task definition.
+2. **Delegation:** The parent Agent pauses its primary loop and waits for the Teammate to either complete the task, request clarification, or fail.
+3. **Tool Sharing:** Permissions can be explicitly passed down. For example, a "read-only" research Agent might not be granted the `FileEditTool` or `BashTool`.
+
+## Prompt Execution Flow
+
+The core loop of Claude Code relies on standard language model interactions, highly optimized for tool use.
+
+1. **User Input:** A prompt or command is entered.
+2. **System Prompt Assembly:** `main.tsx` and context providers build a dense system prompt containing tool schemas, current git status, and OS environment details.
+3. **Model Generation:** Anthropic's Claude generates a response. If it includes a `tool_use` block, the CLI parses it.
+4. **Tool Execution:** The specific Tool (`call()` method) is executed in the local environment (e.g., executing a bash command).
+5. **Feedback Loop:** The `tool_result` is appended to the message history, and control is passed back to the model to evaluate the result and determine the next steps.
+
 ## Startup Flow (`main.tsx`)
 
 1. **Environment Setup:** Profile checkpoints, configuration parsing, pre-fetching of system context (like git status).

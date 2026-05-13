@@ -18,15 +18,35 @@ Claude Code comes with a comprehensive set of built-in tools (found in `src/tool
 - **`EnterPlanModeTool` / `ExitPlanModeV2Tool`**: Toggles planning mode to outline steps before execution.
 - **`TaskStopTool`**: Signals that an assigned task or sub-task has been completed or failed.
 
+## Task & Task Tracking
+
+- **`TaskCreateTool`**: Creates a new task.
+- **`TaskGetTool`**: Gets information about a specific task.
+- **`TaskListTool`**: Lists all active tasks.
+- **`TaskUpdateTool`**: Updates an existing task.
+- **`TaskOutputTool`**: Manages the output of a task.
+- **`TaskStopTool`**: Signals that an assigned task or sub-task has been completed or failed.
+- **`TodoWriteTool`**: Tool for managing quick to-dos.
+
 ## Connectivity & Context
 
 - **`WebFetchTool`**: Fetches content from URLs.
 - **`WebSearchTool`**: Searches the web for information (if enabled/configured).
-- **`NotebookEditTool`**: Specialized tool for editing Jupyter notebooks.
 - **`AskUserQuestionTool`**: Pauses execution to explicitly ask the user for input or clarification.
 
 ## Specialized / Environment Specific
 
+- **`BriefTool`**: Tool for creating summaries or briefs.
+- **`ConfigTool`**: Tool for updating Claude Code configuration.
+- **`NotebookEditTool`**: Specialized tool for editing Jupyter notebooks.
+- **`PowerShellTool`**: Tool for executing PowerShell commands (Windows environments).
 - **`REPLTool`**: A tool available when Claude runs inside an interactive REPL environment.
 - **`LSPTool`**: Integrates with Language Server Protocols to provide code intelligence to the model.
 - **`EnterWorktreeTool` / `ExitWorktreeTool`**: Manages git worktrees for safe, isolated code modifications.
+
+## MCP Integrations
+
+- **`MCPTool`**: Core tool for Model Context Protocol integrations.
+- **`McpAuthTool`**: Handles authentication for MCP servers.
+- **`ListMcpResourcesTool`**: Lists resources available from connected MCP servers.
+- **`ReadMcpResourceTool`**: Reads resources from connected MCP servers.

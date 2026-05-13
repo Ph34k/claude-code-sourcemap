@@ -7,30 +7,37 @@ This documentation is derived from a source-map restored snapshot of the `@anthr
 ## Overview
 
 Claude Code can understand your codebase, edit files, run terminal commands, and handle entire workflows for you. It relies on a robust architecture featuring:
+
 - An Agent Swarm / Teammate model for delegation.
 - A Tool-based execution environment (Read, Edit, Execute Bash).
 - Model Context Protocol (MCP) integrations for connecting external services and workflows.
 
 ## Table of Contents
 
+- [Getting Started](./getting-started.md)
 - [Architecture & Design](./architecture.md)
 - [API Reference](./api/README.md)
   - [Commands API](./api/commands.md)
   - [Tools API](./api/tools.md)
+- [CLI Reference](./cli-reference.md)
 - [Available Tools](./tools/built-in.md)
 - [Model Context Protocol (MCP)](./mcp/README.md)
+- [Plugins and Skills](./plugins-and-skills.md)
 
 ## Starting a session
 
 To start an interactive session:
+
 ```bash
 claude
 ```
 
 For non-interactive or scripted output:
+
 ```bash
 claude -p "Your prompt here"
 ```
 
 ## Contributing
+
 Since this is a snapshot repository, any contributions should take into account that the actual source control is managed by Anthropic.

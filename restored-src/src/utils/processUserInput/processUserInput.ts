@@ -197,11 +197,16 @@ export async function processUserInput({
       )
       return {
         messages: [
-          // TODO: Make this an attachment message
-          createSystemMessage(
-            `${blockingMessage}\n\nOriginal prompt: ${input}`,
-            'warning',
-          ),
+          createAttachmentMessage({
+            type: 'hook_blocking_error',
+            hookName: hookResult.hookSource ?? hookResult.blockingError.command ?? 'UserPromptSubmit',
+            toolUseID: `hook-${randomUUID()}`,
+            hookEvent: 'UserPromptSubmit',
+            blockingError: {
+              blockingError: `${blockingMessage}\n\nOriginal prompt: ${input}`,
+              command: hookResult.blockingError.command,
+            },
+          }),
         ],
         shouldQuery: false,
         allowedTools: result.allowedTools,

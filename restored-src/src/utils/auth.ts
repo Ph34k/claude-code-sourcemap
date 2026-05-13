@@ -1,5 +1,5 @@
 import chalk from 'chalk'
-import { exec } from 'child_process'
+import { exec, execFileSync, spawn } from 'child_process'
 import { execa } from 'execa'
 import { mkdir, stat } from 'fs/promises'
 import memoize from 'lodash-es/memoize.js'
@@ -26,6 +26,7 @@ import {
 } from '../services/oauth/client.js'
 import { getOauthProfileFromOauthToken } from '../services/oauth/getOauthProfile.js'
 import type { OAuthTokens, SubscriptionType } from '../services/oauth/types.js'
+import { parseArguments } from './argumentSubstitution.js'
 import {
   getApiKeyFromFileDescriptor,
   getOAuthTokenFromFileDescriptor,
@@ -555,8 +556,13 @@ async function _executeApiKeyHelper(
     }
   }
 
-  const result = await execa(apiKeyHelper, {
-    shell: true,
+  const [cmd, ...args] = parseArguments(apiKeyHelper)
+  if (!cmd) {
+    throw new Error('apiKeyHelper resolved to empty command')
+  }
+
+  const result = await execa(cmd, args, {
+    shell: false,
     timeout: 10 * 60 * 1000,
     reject: false,
   })
@@ -654,8 +660,17 @@ export function refreshAwsAuth(awsAuthRefresh: string): Promise<boolean> {
   authStatusManager.startAuthentication()
 
   return new Promise(resolve => {
-    const refreshProc = exec(awsAuthRefresh, {
+    const [cmd, ...args] = parseArguments(awsAuthRefresh)
+    if (!cmd) {
+      logForDebugging('awsAuthRefresh resolved to empty command', { level: 'error' })
+      authStatusManager.endAuthentication(false)
+      resolve(false)
+      return
+    }
+
+    const refreshProc = spawn(cmd, args, {
       timeout: AWS_AUTH_REFRESH_TIMEOUT_MS,
+      shell: false,
     })
     refreshProc.stdout!.on('data', data => {
       const output = data.toString().trim()
@@ -740,8 +755,13 @@ async function getAwsCredsFromCredentialExport(): Promise<{
     // only actually do the export if caller-identity calls
     try {
       logForDebugging('Running AWS credential export command')
-      const result = await execa(awsCredentialExport, {
-        shell: true,
+      const [cmd, ...args] = parseArguments(awsCredentialExport)
+      if (!cmd) {
+        throw new Error('awsCredentialExport resolved to empty command')
+      }
+
+      const result = await execa(cmd, args, {
+        shell: false,
         reject: false,
       })
       if (result.exitCode !== 0 || !result.stdout) {
@@ -922,8 +942,17 @@ export function refreshGcpAuth(gcpAuthRefresh: string): Promise<boolean> {
   authStatusManager.startAuthentication()
 
   return new Promise(resolve => {
-    const refreshProc = exec(gcpAuthRefresh, {
+    const [cmd, ...args] = parseArguments(gcpAuthRefresh)
+    if (!cmd) {
+      logForDebugging('gcpAuthRefresh resolved to empty command', { level: 'error' })
+      authStatusManager.endAuthentication(false)
+      resolve(false)
+      return
+    }
+
+    const refreshProc = spawn(cmd, args, {
       timeout: GCP_AUTH_REFRESH_TIMEOUT_MS,
+      shell: false,
     })
     refreshProc.stdout!.on('data', data => {
       const output = data.toString().trim()
@@ -1795,8 +1824,14 @@ export function getOtelHeadersFromHelper(): Record<string, string> {
   }
 
   try {
-    const result = execSyncWithDefaults_DEPRECATED(otelHeadersHelper, {
+    const [cmd, ...args] = parseArguments(otelHeadersHelper)
+    if (!cmd) {
+      throw new Error('otelHeadersHelper resolved to empty command')
+    }
+
+    const result = execFileSync(cmd, args, {
       timeout: 30000, // 30 seconds - allows for auth service latency
+      shell: false,
     })
       ?.toString()
       .trim()

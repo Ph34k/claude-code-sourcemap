@@ -12,7 +12,6 @@ import type { KeyboardEvent } from '../../../ink/events/keyboard-event.js';
 import { Box, Text } from '../../../ink.js';
 import type { AppState } from '../../../state/AppStateStore.js';
 import { AGENT_TOOL_NAME } from '../../../tools/AgentTool/constants.js';
-import { EXIT_PLAN_MODE_V2_TOOL_NAME } from '../../../tools/ExitPlanModeTool/constants.js';
 import type { AllowedPrompt } from '../../../tools/ExitPlanModeTool/ExitPlanModeV2Tool.js';
 import { TEAM_CREATE_TOOL_NAME } from '../../../tools/TeamCreateTool/constants.js';
 import { isAgentSwarmsEnabled } from '../../../utils/agentSwarmsEnabled.js';
@@ -30,7 +29,7 @@ import type { PermissionUpdate } from '../../../utils/permissions/PermissionUpda
 import { isAutoModeGateEnabled, restoreDangerousPermissions, stripDangerousPermissionsForAutoMode } from '../../../utils/permissions/permissionSetup.js';
 import { getPewterLedgerVariant, isPlanModeInterviewPhaseEnabled } from '../../../utils/planModeV2.js';
 import { getPlan, getPlanFilePath } from '../../../utils/plans.js';
-import { editFileInEditor, editPromptInEditor } from '../../../utils/promptEditor.js';
+import { editFileInEditor } from '../../../utils/promptEditor.js';
 import { getCurrentSessionTitle, getTranscriptPath, saveAgentName, saveCustomTitle } from '../../../utils/sessionStorage.js';
 import { getSettings_DEPRECATED } from '../../../utils/settings/settings.js';
 import { type OptionWithDescription, Select } from '../../CustomSelect/index.js';
@@ -185,19 +184,13 @@ export function ExitPlanModePermissionRequest({
   const imageAttachments = Object.values(pastedContents).filter(c => c.type === 'image');
   const hasImages = imageAttachments.length > 0;
 
-  // TODO: Delete the branch after moving to V2
-  // Use tool name to detect V2 instead of checking input.plan, because PR #10394
-  // injects plan content into input.plan for hooks/SDK, which broke the old detection
-  // (see issue #10878)
-  const isV2 = toolUseConfirm.tool.name === EXIT_PLAN_MODE_V2_TOOL_NAME;
-  const inputPlan = isV2 ? undefined : toolUseConfirm.input.plan as string | undefined;
-  const planFilePath = isV2 ? getPlanFilePath() : undefined;
+  const planFilePath = getPlanFilePath();
 
   // Extract allowed prompts requested by the plan (Ant-only feature)
   const allowedPrompts = toolUseConfirm.input.allowedPrompts as AllowedPrompt[] | undefined;
 
   // Get the raw plan to check if it's empty
-  const rawPlan = inputPlan ?? getPlan();
+  const rawPlan = getPlan();
   const isEmpty = !rawPlan || rawPlan.trim() === '';
 
   // Capture the variant once on mount. GrowthBook reads from a disk cache
@@ -206,7 +199,6 @@ export function ExitPlanModePermissionRequest({
   // not user input.
   const [planStructureVariant] = useState(() => (getPewterLedgerVariant() ?? undefined) as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS);
   const [currentPlan, setCurrentPlan] = useState(() => {
-    if (inputPlan) return inputPlan;
     const plan = getPlan();
     return plan ?? 'No plan found. Please write your plan to the plan file first.';
   });
@@ -230,7 +222,7 @@ export function ExitPlanModePermissionRequest({
       e.preventDefault();
       logEvent('tengu_plan_external_editor_used', {});
       void (async () => {
-        if (isV2 && planFilePath) {
+        if (planFilePath) {
           const result = await editFileInEditor(planFilePath);
           if (result.error) {
             addNotification({
@@ -242,20 +234,6 @@ export function ExitPlanModePermissionRequest({
           }
           if (result.content !== null) {
             if (result.content !== currentPlan) setPlanEditedLocally(true);
-            setCurrentPlan(result.content);
-            setShowSaveMessage(true);
-          }
-        } else {
-          const result = await editPromptInEditor(currentPlan);
-          if (result.error) {
-            addNotification({
-              key: 'external-editor-error',
-              text: result.error,
-              color: 'warning',
-              priority: 'high'
-            });
-          }
-          if (result.content !== null && result.content !== currentPlan) {
             setCurrentPlan(result.content);
             setShowSaveMessage(true);
           }
@@ -301,10 +279,10 @@ export function ExitPlanModePermissionRequest({
       return;
     }
 
-    // V1: pass plan in input. V2: plan is on disk, but if the user edited it
-    // via Ctrl+G we pass it through so the tool echoes the edit in tool_result
-    // (otherwise the model never sees the user's changes).
-    const updatedInput = isV2 && !planEditedLocally ? {} : {
+    // Plan is on disk, but if the user edited it via Ctrl+G we pass it through
+    // so the tool echoes the edit in tool_result (otherwise the model never sees
+    // the user's changes).
+    const updatedInput = !planEditedLocally ? {} : {
       plan: currentPlan
     };
 
@@ -542,7 +520,7 @@ export function ExitPlanModePermissionRequest({
             <Text bold dimColor>
               {editorName}
             </Text>
-            {isV2 && planFilePath && <Text dimColor> · {getDisplayPath(planFilePath)}</Text>}
+            {planFilePath && <Text dimColor> · {getDisplayPath(planFilePath)}</Text>}
             {showSaveMessage && <>
                 <Text dimColor>{' · '}</Text>
                 <Text color="success">{figures.tick}Plan saved!</Text>
@@ -552,7 +530,7 @@ export function ExitPlanModePermissionRequest({
     return () => setStickyFooter(null);
     // onImagePaste/onRemoveImage are stable (useCallback/useRef-backed above)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [useStickyFooter, setStickyFooter, options, pastedContents, editorName, isV2, planFilePath, showSaveMessage]);
+  }, [useStickyFooter, setStickyFooter, options, pastedContents, editorName, planFilePath, showSaveMessage]);
 
   // Simplified UI for empty plans
   if (isEmpty) {
@@ -660,7 +638,7 @@ export function ExitPlanModePermissionRequest({
             <Text bold dimColor>
               {editorName}
             </Text>
-            {isV2 && planFilePath && <Text dimColor> · {getDisplayPath(planFilePath)}</Text>}
+            {planFilePath && <Text dimColor> · {getDisplayPath(planFilePath)}</Text>}
           </Box>
           {showSaveMessage && <Box>
               <Text dimColor>{' · '}</Text>

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Claude Code Sourcemap"
+  short_description: "Repo-specific patterns and workflows for claude-code-sourcemap"
+  default_prompt: "Use the claude-code-sourcemap repo skill to follow existing architecture, testing, and workflow conventions."
+policy:
+  allow_implicit_invocation: true

@@ -2551,40 +2551,6 @@ export function checkSemantics(commands: SimpleCommand[]): SemanticCheckResult {
       }
     }
 
-    // Check argv (not .text) to catch both single-quote (`'\n#'`) and
-    // double-quote (`"\n#"`) variants. Env vars and redirects are also
-    // part of the .text span so the same downstream bug applies.
-    // Heredoc bodies are excluded from argv so markdown `##` headers
-    // don't trigger this.
-    // TODO: remove once downstream path validation operates on argv.
-    for (const arg of cmd.argv) {
-      if (arg.includes('\n') && NEWLINE_HASH_RE.test(arg)) {
-        return {
-          ok: false,
-          reason:
-            'Newline followed by # inside a quoted argument can hide arguments from path validation',
-        }
-      }
-    }
-    for (const ev of cmd.envVars) {
-      if (ev.value.includes('\n') && NEWLINE_HASH_RE.test(ev.value)) {
-        return {
-          ok: false,
-          reason:
-            'Newline followed by # inside an env var value can hide arguments from path validation',
-        }
-      }
-    }
-    for (const r of cmd.redirects) {
-      if (r.target.includes('\n') && NEWLINE_HASH_RE.test(r.target)) {
-        return {
-          ok: false,
-          reason:
-            'Newline followed by # inside a redirect target can hide arguments from path validation',
-        }
-      }
-    }
-
     // jq's system() built-in executes arbitrary shell commands, and flags
     // like --from-file can read arbitrary files into jq variables. On the
     // legacy path these are caught by validateJqCommand in bashSecurity.ts,

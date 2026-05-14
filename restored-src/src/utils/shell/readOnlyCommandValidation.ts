@@ -1745,13 +1745,14 @@ export function validateFlags(
       //     echo ∈ SAFE_TARGET_COMMANDS_FOR_XARGS → break → AUTO-ALLOWED
       //   GNU xargs: -E attached arg=`=` → EOF is TARGET COMMAND → CODE EXEC
       //
-      // Fix: when hasEquals is true, use inlineValue (even if empty) as the
+      // Security Note: when hasEquals is true, use inlineValue (even if empty) as the
       // provided arg. validateFlagArgument('', 'EOF') → false → rejected.
       // This is correct for all arg types: the user explicitly typed `=`,
       // indicating they provided a value (empty). Don't consume next token.
-      const hasEquals = token.includes('=')
-      const [flag, ...valueParts] = token.split('=')
-      const inlineValue = valueParts.join('=')
+      const equalsIndex = token.indexOf('=')
+      const hasEquals = equalsIndex !== -1
+      const flag = hasEquals ? token.substring(0, equalsIndex) : token
+      const inlineValue = hasEquals ? token.substring(equalsIndex + 1) : ''
 
       if (!flag) {
         return false
@@ -1805,7 +1806,7 @@ export function validateFlags(
         // the xargs target (in SAFE_TARGET_COMMANDS_FOR_XARGS → break), but
         // xargs ran `sh -c id`. ARBITRARY RCE with only Bash(echo:*) or less.
         //
-        // Fix: require ALL bundled flags to have arg type 'none'. If any bundled
+        // Security Note: require ALL bundled flags to have arg type 'none'. If any bundled
         // flag requires an argument (non-'none' type), reject the whole bundle.
         // This is conservative — it blocks `-rI` (xargs) entirely, but that's
         // the safe direction. Users who need `-I` can use it unbundled: `-r -I {}`.

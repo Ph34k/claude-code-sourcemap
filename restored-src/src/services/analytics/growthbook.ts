@@ -46,16 +46,6 @@ export type GrowthBookUserAttributes = {
   github?: GitHubActionsMetadata
 }
 
-/**
- * Malformed feature response from API that uses "value" instead of "defaultValue".
- * This is a workaround until the API is fixed.
- */
-type MalformedFeatureDefinition = {
-  value?: unknown
-  defaultValue?: unknown
-  [key: string]: unknown
-}
-
 let client: GrowthBook | null = null
 
 // Named handler refs so resetGrowthBook can remove them to prevent accumulation
@@ -327,9 +317,6 @@ function logExposureForFeature(feature: string): void {
 async function processRemoteEvalPayload(
   gbClient: GrowthBook,
 ): Promise<boolean> {
-  // WORKAROUND: Transform remote eval response format
-  // The API returns { "value": ... } but SDK expects { "defaultValue": ... }
-  // TODO: Remove this once the API is fixed to return correct format
   const payload = gbClient.getPayload()
   // Empty object is truthy — without the length check, `{features: {}}`
   // (transient server bug, truncated response) would pass, clear the maps
@@ -343,51 +330,32 @@ async function processRemoteEvalPayload(
   // leave stale ghost entries that short-circuit getFeatureValueInternal.
   experimentDataByFeature.clear()
 
-  const transformedFeatures: Record<string, MalformedFeatureDefinition> = {}
+  // WORKAROUND: Cache the evaluated values directly from remote eval response.
+  // The SDK's evalFeature() tries to re-evaluate rules locally, ignoring the
+  // pre-evaluated values from remoteEval. setForcedFeatures also doesn't work
+  // reliably. So we cache values ourselves and use them in getFeatureValueInternal.
+  remoteEvalFeatureValues.clear()
+
   for (const [key, feature] of Object.entries(payload.features)) {
-    const f = feature as MalformedFeatureDefinition
-    if ('value' in f && !('defaultValue' in f)) {
-      transformedFeatures[key] = {
-        ...f,
-        defaultValue: f.value,
-      }
-    } else {
-      transformedFeatures[key] = f
+    const f = feature as {
+      defaultValue?: unknown
+      source?: string
+      experimentResult?: { variationId?: number }
+      experiment?: { key?: string }
     }
 
     // Store experiment data for later logging when feature is accessed
     if (f.source === 'experiment' && f.experimentResult) {
-      const expResult = f.experimentResult as {
-        variationId?: number
-      }
-      const exp = f.experiment as { key?: string } | undefined
-      if (exp?.key && expResult.variationId !== undefined) {
+      if (f.experiment?.key && f.experimentResult.variationId !== undefined) {
         experimentDataByFeature.set(key, {
-          experimentId: exp.key,
-          variationId: expResult.variationId,
+          experimentId: f.experiment.key,
+          variationId: f.experimentResult.variationId,
         })
       }
     }
-  }
-  // Re-set the payload with transformed features
-  await gbClient.setPayload({
-    ...payload,
-    features: transformedFeatures,
-  })
 
-  // WORKAROUND: Cache the evaluated values directly from remote eval response.
-  // The SDK's evalFeature() tries to re-evaluate rules locally, ignoring the
-  // pre-evaluated 'value' from remoteEval. setForcedFeatures also doesn't work
-  // reliably. So we cache values ourselves and use them in getFeatureValueInternal.
-  remoteEvalFeatureValues.clear()
-  for (const [key, feature] of Object.entries(transformedFeatures)) {
-    // Under remoteEval:true the server pre-evaluates. Whether the answer
-    // lands in `value` (current API) or `defaultValue` (post-TODO API shape),
-    // it's the authoritative value for this user. Guarding on both keeps
-    // syncRemoteEvalToDisk correct across a partial or full API migration.
-    const v = 'value' in feature ? feature.value : feature.defaultValue
-    if (v !== undefined) {
-      remoteEvalFeatureValues.set(key, v)
+    if (f.defaultValue !== undefined) {
+      remoteEvalFeatureValues.set(key, f.defaultValue)
     }
   }
   return true

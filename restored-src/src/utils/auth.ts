@@ -56,6 +56,7 @@ import {
 } from './envUtils.js'
 import { errorMessage } from './errors.js'
 import { execSyncWithDefaults_DEPRECATED } from './execFileNoThrow.js'
+import { redactSensitiveInfo } from "./redact.js";
 import * as lockfile from './lockfile.js'
 import { logError } from './log.js'
 import { memoizeWithTTLAsync } from './memoize.js'
@@ -658,7 +659,7 @@ export function refreshAwsAuth(awsAuthRefresh: string): Promise<boolean> {
       timeout: AWS_AUTH_REFRESH_TIMEOUT_MS,
     })
     refreshProc.stdout!.on('data', data => {
-      const output = data.toString().trim()
+      const output = redactSensitiveInfo(data.toString().trim())
       if (output) {
         // Add output to status manager for UI display
         authStatusManager.addOutput(output)
@@ -668,7 +669,7 @@ export function refreshAwsAuth(awsAuthRefresh: string): Promise<boolean> {
     })
 
     refreshProc.stderr!.on('data', data => {
-      const error = data.toString().trim()
+      const error = redactSensitiveInfo(data.toString().trim())
       if (error) {
         authStatusManager.setError(error)
         logForDebugging(error, { level: 'error' })
@@ -926,7 +927,7 @@ export function refreshGcpAuth(gcpAuthRefresh: string): Promise<boolean> {
       timeout: GCP_AUTH_REFRESH_TIMEOUT_MS,
     })
     refreshProc.stdout!.on('data', data => {
-      const output = data.toString().trim()
+      const output = redactSensitiveInfo(data.toString().trim())
       if (output) {
         // Add output to status manager for UI display
         authStatusManager.addOutput(output)
@@ -936,7 +937,7 @@ export function refreshGcpAuth(gcpAuthRefresh: string): Promise<boolean> {
     })
 
     refreshProc.stderr!.on('data', data => {
-      const error = data.toString().trim()
+      const error = redactSensitiveInfo(data.toString().trim())
       if (error) {
         authStatusManager.setError(error)
         logForDebugging(error, { level: 'error' })

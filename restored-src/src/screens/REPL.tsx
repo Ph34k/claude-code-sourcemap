@@ -3105,32 +3105,17 @@ export function REPL({
       await awaitPendingHooks();
 
       // Route all initial prompts through onSubmit to ensure UserPromptSubmit hooks fire
-      // TODO: Simplify by always routing through onSubmit once it supports
-      // ContentBlockParam arrays (images) as input
       const content = initialMsg.message.message.content;
 
-      // Route all string content through onSubmit to ensure hooks fire
-      // For complex content (images, etc.), fall back to direct onQuery
-      // Plan messages bypass onSubmit to preserve planContent metadata for rendering
-      if (typeof content === 'string' && !initialMsg.message.planContent) {
-        // Route through onSubmit for proper processing including UserPromptSubmit hooks
-        void onSubmit(content, {
-          setCursorOffset: () => {},
-          clearBuffer: () => {},
-          resetHistory: () => {}
-        });
-      } else {
-        // Plan messages or complex content (images, etc.) - send directly to model
-        // Plan messages use onQuery to preserve planContent metadata for rendering
-        // TODO: Once onSubmit supports ContentBlockParam arrays, remove this branch
-        const newAbortController = createAbortController();
-        setAbortController(newAbortController);
-        void onQuery([initialMsg.message], newAbortController, true,
-        // shouldQuery
-        [],
-        // additionalAllowedTools
-        mainLoopModel);
-      }
+      // Route through onSubmit for proper processing including UserPromptSubmit hooks
+      void onSubmit(content, {
+        setCursorOffset: () => {},
+        clearBuffer: () => {},
+        resetHistory: () => {}
+      }, undefined, {
+        uuid: initialMsg.message.uuid,
+        planContent: initialMsg.message.planContent
+      });
 
       // Reset ref after a delay to allow new initial messages
       setTimeout(ref => {
@@ -3139,13 +3124,16 @@ export function REPL({
     }
     void processInitialMessage(pending);
   }, [initialMessage, isLoading, setMessages, setAppState, onQuery, mainLoopModel, tools]);
-  const onSubmit = useCallback(async (input: string, helpers: PromptInputHelpers, speculationAccept?: {
+  const onSubmit = useCallback(async (input: string | ContentBlockParam[], helpers: PromptInputHelpers, speculationAccept?: {
     state: ActiveSpeculationState;
     speculationSessionTimeSavedMs: number;
     setAppState: SetAppState;
   }, options?: {
     fromKeybinding?: boolean;
+    uuid?: UUID;
+    planContent?: string;
   }) => {
+    const isStringInput = typeof input === 'string';
     // Re-pin scroll to bottom on submit so the user always sees the new
     // exchange (matches OpenCode's auto-scroll behavior).
     repinScroll();
@@ -3158,11 +3146,11 @@ export function REPL({
     // Handle immediate commands - these bypass the queue and execute right away
     // even while Claude is processing. Commands opt-in via `immediate: true`.
     // Commands triggered via keybindings are always treated as immediate.
-    if (!speculationAccept && input.trim().startsWith('/')) {
+    if (isStringInput && !speculationAccept && (input as string).trim().startsWith('/')) {
       // Expand [Pasted text #N] refs so immediate commands (e.g. /btw) receive
       // the pasted content, not the placeholder. The non-immediate path gets
       // this expansion later in handlePromptSubmit.
-      const trimmedInput = expandPastedTextRefs(input, pastedContents).trim();
+      const trimmedInput = expandPastedTextRefs(input as string, pastedContents).trim();
       const spaceIndex = trimmedInput.indexOf(' ');
       const commandName = spaceIndex === -1 ? trimmedInput.slice(1) : trimmedInput.slice(1, spaceIndex);
       const commandArgs = spaceIndex === -1 ? '' : trimmedInput.slice(spaceIndex + 1).trim();
@@ -3186,13 +3174,13 @@ export function REPL({
         // Only clear input if the submitted text matches what's in the prompt.
         // When a command keybinding fires, input is "/<command>" but the actual
         // input value is the user's existing text - don't clear it in that case.
-        if (input.trim() === inputValueRef.current.trim()) {
+        if ((input as string).trim() === inputValueRef.current.trim()) {
           setInputValue('');
           helpers.setCursorOffset(0);
           helpers.clearBuffer();
           setPastedContents({});
         }
-        const pastedTextRefs = parseReferences(input).filter(r => pastedContents[r.id]?.type === 'text');
+        const pastedTextRefs = parseReferences(input as string).filter(r => pastedContents[r.id]?.type === 'text');
         const pastedTextCount = pastedTextRefs.length;
         const pastedTextBytes = pastedTextRefs.reduce((sum, r) => sum + (pastedContents[r.id]?.content.length ?? 0), 0);
         logEvent('tengu_paste_text', {
@@ -3282,7 +3270,7 @@ export function REPL({
     }
 
     // Remote mode: skip empty input early before any state mutations
-    if (activeRemote.isRemoteMode && !input.trim()) {
+    if (activeRemote.isRemoteMode && isStringInput && !(input as string).trim()) {
       return;
     }
 
@@ -3293,12 +3281,12 @@ export function REPL({
       const willowMode = getFeatureValue_CACHED_MAY_BE_STALE('tengu_willow_mode', 'off');
       const idleThresholdMin = Number(process.env.CLAUDE_CODE_IDLE_THRESHOLD_MINUTES ?? 75);
       const tokenThreshold = Number(process.env.CLAUDE_CODE_IDLE_TOKEN_THRESHOLD ?? 100_000);
-      if (willowMode !== 'off' && !getGlobalConfig().idleReturnDismissed && !skipIdleCheckRef.current && !speculationAccept && !input.trim().startsWith('/') && lastQueryCompletionTimeRef.current > 0 && getTotalInputTokens() >= tokenThreshold) {
+      if (willowMode !== 'off' && !getGlobalConfig().idleReturnDismissed && !skipIdleCheckRef.current && !speculationAccept && (!isStringInput || !(input as string).trim().startsWith('/')) && lastQueryCompletionTimeRef.current > 0 && getTotalInputTokens() >= tokenThreshold) {
         const idleMs = Date.now() - lastQueryCompletionTimeRef.current;
         const idleMinutes = idleMs / 60_000;
         if (idleMinutes >= idleThresholdMin && willowMode === 'dialog') {
           setIdleReturnPending({
-            input,
+            input: isStringInput ? input as string : '',
             idleMinutes
           });
           setInputValue('');
@@ -3313,15 +3301,16 @@ export function REPL({
     // Queued command processing (executeQueuedInput) doesn't call onSubmit,
     // so notifications and already-queued user input won't be added to history here.
     // Skip history for keybinding-triggered commands (user didn't type the command).
-    if (!options?.fromKeybinding) {
+    // Only add string inputs to history.
+    if (!options?.fromKeybinding && isStringInput) {
       addToHistory({
-        display: speculationAccept ? input : prependModeCharacterToInput(input, inputMode),
+        display: speculationAccept ? input as string : prependModeCharacterToInput(input as string, inputMode),
         pastedContents: speculationAccept ? {} : pastedContents
       });
       // Add the just-submitted command to the front of the ghost-text
       // cache so it's suggested immediately (not after the 60s TTL).
       if (inputMode === 'bash') {
-        prependToShellHistoryCache(input.trim());
+        prependToShellHistoryCache((input as string).trim());
       }
     }
 
@@ -3336,7 +3325,7 @@ export function REPL({
     //   Remote mode is exempt: it sends via WebSocket and returns early without
     //   calling handlePromptSubmit, so there's no clobbering risk — restore eagerly.
     // In both deferred cases, the stash is restored after await handlePromptSubmit.
-    const isSlashCommand = !speculationAccept && input.trim().startsWith('/');
+    const isSlashCommand = isStringInput && !speculationAccept && (input as string).trim().startsWith('/');
     // Submit runs "now" (not queued) when not already loading, or when
     // accepting speculation, or in remote mode (which sends via WS and
     // returns early without calling handlePromptSubmit).
@@ -3366,7 +3355,7 @@ export function REPL({
       // Skip for slash/bash (they have their own echo), speculation and remote
       // mode (both setMessages directly with no gap to bridge).
       if (!isSlashCommand && inputMode === 'prompt' && !speculationAccept && !activeRemote.isRemoteMode) {
-        setUserInputOnProcessing(input);
+        setUserInputOnProcessing(isStringInput ? input as string : undefined);
         // showSpinner includes userInputOnProcessing, so the spinner appears
         // on this render. Reset timing refs now (before queryGuard.reserve()
         // would) so elapsed time doesn't read as Date.now() - 0. The
@@ -3392,7 +3381,7 @@ export function REPL({
     if (speculationAccept) {
       const {
         queryRequired
-      } = await handleSpeculationAccept(speculationAccept.state, speculationAccept.speculationSessionTimeSavedMs, speculationAccept.setAppState, input, {
+      } = await handleSpeculationAccept(speculationAccept.state, speculationAccept.speculationSessionTimeSavedMs, speculationAccept.setAppState, input as string, {
         setMessages,
         readFileState,
         cwd: getOriginalCwd()
@@ -3414,31 +3403,36 @@ export function REPL({
     // handlePromptSubmit so they execute locally. Prompt commands and
     // plain text go to the remote.
     if (activeRemote.isRemoteMode && !(isSlashCommand && commands.find(c => {
-      const name = input.trim().slice(1).split(/\s/)[0];
+      const name = (input as string).trim().slice(1).split(/\s/)[0];
       return isCommandEnabled(c) && (c.name === name || c.aliases?.includes(name!) || getCommandName(c) === name);
     })?.type === 'local-jsx')) {
       // Build content blocks when there are pasted attachments (images)
       const pastedValues = Object.values(pastedContents);
       const imageContents = pastedValues.filter(c => c.type === 'image');
       const imagePasteIds = imageContents.length > 0 ? imageContents.map(c => c.id) : undefined;
-      let messageContent: string | ContentBlockParam[] = input.trim();
-      let remoteContent: RemoteMessageContent = input.trim();
+      let messageContent: string | ContentBlockParam[] = isStringInput ? (input as string).trim() : input;
+      let remoteContent: RemoteMessageContent = isStringInput ? (input as string).trim() : input;
       if (pastedValues.length > 0) {
         const contentBlocks: ContentBlockParam[] = [];
         const remoteBlocks: Array<{
           type: string;
           [key: string]: unknown;
         }> = [];
-        const trimmedInput = input.trim();
-        if (trimmedInput) {
-          contentBlocks.push({
-            type: 'text',
-            text: trimmedInput
-          });
-          remoteBlocks.push({
-            type: 'text',
-            text: trimmedInput
-          });
+        const trimmedInput = isStringInput ? (input as string).trim() : '';
+        if (trimmedInput || !isStringInput) {
+          if (isStringInput) {
+            contentBlocks.push({
+              type: 'text',
+              text: trimmedInput
+            });
+            remoteBlocks.push({
+              type: 'text',
+              text: trimmedInput
+            });
+          } else {
+            contentBlocks.push(...(input as ContentBlockParam[]));
+            remoteBlocks.push(...(input as ContentBlockParam[]).map(b => b as unknown as { type: string; [key: string]: unknown }));
+          }
         }
         for (const pasted of pastedValues) {
           if (pasted.type === 'image') {
@@ -3489,6 +3483,8 @@ export function REPL({
     await awaitPendingHooks();
     await handlePromptSubmit({
       input,
+      uuid: options?.uuid,
+      planContent: options?.planContent,
       helpers,
       queryGuard,
       isExternalLoading,

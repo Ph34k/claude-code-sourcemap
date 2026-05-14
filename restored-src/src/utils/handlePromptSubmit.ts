@@ -91,8 +91,9 @@ export type PromptInputHelpers = {
 
 export type HandlePromptSubmitParams = BaseExecutionParams & {
   // Direct user input path (set when called from onSubmit, absent for queue processor)
-  input?: string
+  input?: string | ContentBlockParam[]
   mode?: PromptInputMode
+  planContent?: string
   pastedContents?: Record<number, PastedContent>
   helpers: PromptInputHelpers
   onInputChange: (value: string) => void
@@ -174,10 +175,13 @@ export async function handlePromptSubmit(
   const input = params.input ?? ''
   const mode = params.mode ?? 'prompt'
   const rawPastedContents = params.pastedContents ?? {}
+  const planContent = params.planContent
+
+  const isStringInput = typeof input === 'string'
 
   // Images are only sent if their [Image #N] placeholder is still in the text.
   // Deleting the inline pill drops the image; orphaned entries are filtered here.
-  const referencedIds = new Set(parseReferences(input).map(r => r.id))
+  const referencedIds = new Set(isStringInput ? parseReferences(input).map(r => r.id) : [])
   const pastedContents = Object.fromEntries(
     Object.entries(rawPastedContents).filter(
       ([, c]) => c.type !== 'image' || referencedIds.has(c.id),
@@ -185,13 +189,14 @@ export async function handlePromptSubmit(
   )
 
   const hasImages = Object.values(pastedContents).some(isValidImagePaste)
-  if (input.trim() === '') {
+  if (isStringInput && input.trim() === '') {
     return
   }
 
   // Handle exit commands by triggering the exit command instead of direct process.exit
   // Skip for remote bridge messages — "exit" typed on iOS shouldn't kill the local session
   if (
+    isStringInput &&
     !skipSlashCommands &&
     ['exit', 'quit', ':q', ':q!', ':wq', ':wq!'].includes(input.trim())
   ) {
@@ -213,10 +218,10 @@ export async function handlePromptSubmit(
   // Parse references and replace with actual content early, before queueing
   // or immediate-command dispatch, so queued commands and immediate commands
   // both receive the expanded text from when it was submitted.
-  const finalInput = expandPastedTextRefs(input, pastedContents)
-  const pastedTextRefs = parseReferences(input).filter(
+  const finalInput = isStringInput ? expandPastedTextRefs(input, pastedContents) : input
+  const pastedTextRefs = isStringInput ? parseReferences(input).filter(
     r => pastedContents[r.id]?.type === 'text',
-  )
+  ) : []
   const pastedTextCount = pastedTextRefs.length
   const pastedTextBytes = pastedTextRefs.reduce(
     (sum, r) => sum + (pastedContents[r.id]?.content.length ?? 0),
@@ -226,8 +231,8 @@ export async function handlePromptSubmit(
 
   // Handle local-jsx immediate commands (e.g., /config, /doctor)
   // Skip for remote bridge messages — slash commands from CCR clients are plain text
-  if (!skipSlashCommands && finalInput.trim().startsWith('/')) {
-    const trimmedInput = finalInput.trim()
+  if (isStringInput && !skipSlashCommands && (finalInput as string).trim().startsWith('/')) {
+    const trimmedInput = (finalInput as string).trim()
     const spaceIndex = trimmedInput.indexOf(' ')
     const commandName =
       spaceIndex === -1
@@ -334,12 +339,13 @@ export async function handlePromptSubmit(
     // Enqueue with string value + raw pastedContents. Images will be resized
     // at execution time when processUserInput runs (not baked in here).
     enqueue({
-      value: finalInput.trim(),
-      preExpansionValue: input.trim(),
+      value: isStringInput ? (finalInput as string).trim() : finalInput,
+      preExpansionValue: isStringInput ? (input as string).trim() : input,
       mode,
       pastedContents: hasImages ? pastedContents : undefined,
       skipSlashCommands,
       uuid,
+      planContent,
     })
 
     onInputChange('')
@@ -363,6 +369,7 @@ export async function handlePromptSubmit(
     pastedContents: hasImages ? pastedContents : undefined,
     skipSlashCommands,
     uuid,
+    planContent,
   }
 
   await executeUserInput({
@@ -480,6 +487,7 @@ async function executeUserInput(params: ExecuteUserInputParams): Promise<void> {
           setToolJSX,
           context: makeContext(),
           pastedContents: isFirst ? cmd.pastedContents : undefined,
+          planContent: cmd.planContent,
           messages,
           setUserInputOnProcessing: isFirst
             ? setUserInputOnProcessing

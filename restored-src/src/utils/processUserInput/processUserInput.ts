@@ -100,6 +100,7 @@ export async function processUserInput({
   bridgeOrigin,
   isMeta,
   skipAttachments,
+  planContent,
 }: {
   input: string | Array<ContentBlockParam>
   /**
@@ -137,6 +138,7 @@ export async function processUserInput({
    */
   isMeta?: boolean
   skipAttachments?: boolean
+  planContent?: string
 }): Promise<ProcessUserInputBaseResult> {
   const inputString = typeof input === 'string' ? input : null
   // Immediately show the user input prompt while we are still processing the input.
@@ -583,6 +585,7 @@ async function processUserInputBase(
       uuid,
       permissionMode,
       isMeta,
+      planContent,
     ),
     imageMetadataTexts,
   )

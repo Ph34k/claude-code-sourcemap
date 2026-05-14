@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+import { readFile } from 'fs/promises';
 import { REMOTE_CONTROL_DISCONNECTED_MSG } from '../bridge/types.js';
 import type { Command } from '../commands.js';
 import { DIAMOND_OPEN } from '../constants/figures.js';
@@ -47,25 +47,29 @@ const _rawPrompt = require('../utils/ultraplan/prompt.txt');
 /* eslint-enable @typescript-eslint/no-require-imports */
 const DEFAULT_INSTRUCTIONS: string = (typeof _rawPrompt === 'string' ? _rawPrompt : _rawPrompt.default).trimEnd();
 
-// Dev-only prompt override resolved eagerly at module load.
+// Dev-only prompt override resolved dynamically.
 // Gated to ant builds (USER_TYPE is a build-time define,
 // so the override path is DCE'd from external builds).
 // Shell-set env only, so top-level process.env read is fine
 // — settings.env never injects this.
-/* eslint-disable custom-rules/no-process-env-top-level, custom-rules/no-sync-fs -- ant-only dev override; eager top-level read is the point (crash at startup, not silently inside the slash-command try/catch) */
-const ULTRAPLAN_INSTRUCTIONS: string = "external" === 'ant' && process.env.ULTRAPLAN_PROMPT_FILE ? readFileSync(process.env.ULTRAPLAN_PROMPT_FILE, 'utf8').trimEnd() : DEFAULT_INSTRUCTIONS;
-/* eslint-enable custom-rules/no-process-env-top-level, custom-rules/no-sync-fs */
 
 /**
  * Assemble the initial CCR user message. seedPlan and blurb stay outside the
  * system-reminder so the browser renders them; scaffolding is hidden.
  */
-export function buildUltraplanPrompt(blurb: string, seedPlan?: string): string {
+export async function buildUltraplanPrompt(blurb: string, seedPlan?: string): Promise<string> {
   const parts: string[] = [];
   if (seedPlan) {
     parts.push('Here is a draft plan to refine:', '', seedPlan, '');
   }
-  parts.push(ULTRAPLAN_INSTRUCTIONS);
+
+  /* eslint-disable custom-rules/no-process-env-top-level -- ant-only dev override */
+  const instructions = "external" === 'ant' && process.env.ULTRAPLAN_PROMPT_FILE
+    ? (await readFile(process.env.ULTRAPLAN_PROMPT_FILE, 'utf8')).trimEnd()
+    : DEFAULT_INSTRUCTIONS;
+  /* eslint-enable custom-rules/no-process-env-top-level */
+
+  parts.push(instructions);
   if (blurb) {
     parts.push('', blurb);
   }
@@ -325,7 +329,7 @@ async function launchDetached(opts: {
       });
       return;
     }
-    const prompt = buildUltraplanPrompt(blurb, seedPlan);
+    const prompt = await buildUltraplanPrompt(blurb, seedPlan);
     let bundleFailMsg: string | undefined;
     const session = await teleportToRemote({
       initialMessage: prompt,

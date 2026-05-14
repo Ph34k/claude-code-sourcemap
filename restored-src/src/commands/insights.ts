@@ -2768,20 +2768,25 @@ async function scanAllSessions(): Promise<LiteSessionInfo[]> {
 
   const allSessions: LiteSessionInfo[] = []
 
-  for (let i = 0; i < projectDirs.length; i++) {
-    const sessionFiles = await getSessionFilesWithMtime(projectDirs[i]!)
-    for (const [sessionId, fileInfo] of sessionFiles) {
-      allSessions.push({
-        sessionId,
-        path: fileInfo.path,
-        mtime: fileInfo.mtime,
-        size: fileInfo.size,
-      })
+  const batchSize = 10
+  for (let i = 0; i < projectDirs.length; i += batchSize) {
+    const batchDirs = projectDirs.slice(i, i + batchSize)
+    const batchResults = await Promise.all(
+      batchDirs.map(dir => getSessionFilesWithMtime(dir!))
+    )
+
+    for (const sessionFiles of batchResults) {
+      for (const [sessionId, fileInfo] of sessionFiles) {
+        allSessions.push({
+          sessionId,
+          path: fileInfo.path,
+          mtime: fileInfo.mtime,
+          size: fileInfo.size,
+        })
+      }
     }
-    // Yield to event loop every 10 project directories
-    if (i % 10 === 9) {
-      await new Promise<void>(resolve => setImmediate(resolve))
-    }
+    // Yield to event loop between batches
+    await new Promise<void>(resolve => setImmediate(resolve))
   }
 
   // Sort by mtime descending (most recent first)

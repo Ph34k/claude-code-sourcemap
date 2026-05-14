@@ -677,33 +677,37 @@ export const connectToServer = memoize(
         logMCPDebug(name, `SSE transport initialized, awaiting connection`)
       } else if (serverRef.type === 'sse-ide') {
         logMCPDebug(name, `Setting up SSE-IDE transport to ${serverRef.url}`)
-        // IDE servers don't need authentication
-        // TODO: Use the auth token provided in the lockfile
+
         const proxyOptions = getProxyFetchOptions()
-        const transportOptions: SSEClientTransportOptions =
-          proxyOptions.dispatcher
-            ? {
-                eventSourceInit: {
-                  fetch: async (url: string | URL, init?: RequestInit) => {
-                    // eslint-disable-next-line eslint-plugin-n/no-unsupported-features/node-builtins
-                    return fetch(url, {
-                      ...init,
-                      ...proxyOptions,
-                      headers: {
-                        'User-Agent': getMCPUserAgent(),
-                        ...init?.headers,
-                      },
-                    })
-                  },
+        const sseHeaders = {
+          'User-Agent': getMCPUserAgent(),
+          ...(serverRef.authToken && {
+            'X-Claude-Code-Ide-Authorization': serverRef.authToken,
+          }),
+        }
+
+        const transportOptions: SSEClientTransportOptions = {
+          requestInit: {
+            headers: sseHeaders,
+          },
+          eventSourceInit: {
+            fetch: async (url: string | URL, init?: RequestInit) => {
+              // eslint-disable-next-line eslint-plugin-n/no-unsupported-features/node-builtins
+              return fetch(url, {
+                ...init,
+                ...proxyOptions,
+                headers: {
+                  ...sseHeaders,
+                  ...init?.headers,
                 },
-              }
-            : {}
+              })
+            },
+          },
+        }
 
         transport = new SSEClientTransport(
           new URL(serverRef.url),
-          Object.keys(transportOptions).length > 0
-            ? transportOptions
-            : undefined,
+          transportOptions,
         )
       } else if (serverRef.type === 'ws-ide') {
         const tlsOptions = getWebSocketTLSOptions()

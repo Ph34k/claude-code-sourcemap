@@ -24,6 +24,7 @@ export function processTextPrompt(
   uuid?: string,
   permissionMode?: PermissionMode,
   isMeta?: boolean,
+  planContent?: string,
 ): {
   messages: (UserMessage | AttachmentMessage | SystemMessage)[]
   shouldQuery: boolean
@@ -78,6 +79,7 @@ export function processTextPrompt(
       imagePasteIds: imagePasteIds.length > 0 ? imagePasteIds : undefined,
       permissionMode,
       isMeta: isMeta || undefined,
+      planContent,
     })
 
     return {
@@ -91,6 +93,7 @@ export function processTextPrompt(
     uuid,
     permissionMode,
     isMeta: isMeta || undefined,
+    planContent,
   })
 
   return {

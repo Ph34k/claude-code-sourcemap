@@ -355,6 +355,10 @@ export type QueuedCommand = {
    * unified the queue but lost the isolation the dual-queue accidentally had).
    */
   agentId?: AgentId
+  /**
+   * Plan content to persist on the UserMessage for rendering the plan.
+   */
+  planContent?: string
 }
 
 /**

@@ -1,23 +1,23 @@
 import { c as _c } from "react/compiler-runtime";
-import figures from 'figures';
-import React, { useEffect, useState } from 'react';
-import type { CommandResultDisplay } from '../../commands.js';
-import { Box, color, Text, useTheme } from '../../ink.js';
-import { useMcpReconnect } from '../../services/mcp/MCPConnectionManager.js';
-import { useAppStateStore } from '../../state/AppState.js';
-import { Spinner } from '../Spinner.js';
+import figures from "figures";
+import React, { useEffect, useState } from "react";
+import type { CommandResultDisplay } from "../../commands.js";
+import { Box, color, Text, useTheme } from "../../ink.js";
+import { useMcpReconnect } from "../../services/mcp/MCPConnectionManager.js";
+import { useAppStateStore } from "../../state/AppState.js";
+import { Spinner } from "../Spinner.js";
 type Props = {
   serverName: string;
-  onComplete: (result?: string, options?: {
-    display?: CommandResultDisplay;
-  }) => void;
+  onComplete: (
+    result?: string,
+    options?: {
+      display?: CommandResultDisplay;
+    },
+  ) => void;
 };
 export function MCPReconnect(t0) {
   const $ = _c(25);
-  const {
-    serverName,
-    onComplete
-  } = t0;
+  const { serverName, onComplete } = t0;
   const [theme] = useTheme();
   const store = useAppStateStore();
   const reconnectMcpServer = useMcpReconnect();
@@ -25,12 +25,18 @@ export function MCPReconnect(t0) {
   const [error, setError] = useState(null);
   let t1;
   let t2;
-  if ($[0] !== onComplete || $[1] !== reconnectMcpServer || $[2] !== serverName || $[3] !== store) {
+  if (
+    $[0] !== onComplete ||
+    $[1] !== reconnectMcpServer ||
+    $[2] !== serverName ||
+    $[3] !== store
+  ) {
     t1 = () => {
       const attemptReconnect = async function attemptReconnect() {
-        ;
         try {
-          const server = store.getState().mcp.clients.find(c => c.name === serverName);
+          const server = store
+            .getState()
+            .mcp.clients.find((c) => c.name === serverName);
           if (!server) {
             setError(`MCP server "${serverName}" not found`);
             setIsReconnecting(false);
@@ -39,27 +45,26 @@ export function MCPReconnect(t0) {
           }
           const result = await reconnectMcpServer(serverName);
           bb43: switch (result.client.type) {
-            case "connected":
-              {
-                setIsReconnecting(false);
-                onComplete(`Successfully reconnected to ${serverName}`);
-                break bb43;
-              }
-            case "needs-auth":
-              {
-                setError(`${serverName} requires authentication`);
-                setIsReconnecting(false);
-                onComplete(`${serverName} requires authentication. Use /mcp to authenticate.`);
-                break bb43;
-              }
+            case "connected": {
+              setIsReconnecting(false);
+              onComplete(`Successfully reconnected to ${serverName}`);
+              break bb43;
+            }
+            case "needs-auth": {
+              setError(`${serverName} requires authentication`);
+              setIsReconnecting(false);
+              onComplete(
+                `${serverName} requires authentication. Use /mcp to authenticate.`,
+              );
+              break bb43;
+            }
             case "pending":
             case "failed":
-            case "disabled":
-              {
-                setError(`Failed to reconnect to ${serverName}`);
-                setIsReconnecting(false);
-                onComplete(`Failed to reconnect to ${serverName}`);
-              }
+            case "disabled": {
+              setError(`Failed to reconnect to ${serverName}`);
+              setIsReconnecting(false);
+              onComplete(`Failed to reconnect to ${serverName}`);
+            }
           }
         } catch (t3) {
           const err = t3;
@@ -86,7 +91,11 @@ export function MCPReconnect(t0) {
   if (isReconnecting) {
     let t3;
     if ($[6] !== serverName) {
-      t3 = <Text color="text">Reconnecting to <Text bold={true}>{serverName}</Text></Text>;
+      t3 = (
+        <Text color="text">
+          Reconnecting to <Text bold={true}>{serverName}</Text>
+        </Text>
+      );
       $[6] = serverName;
       $[7] = t3;
     } else {
@@ -94,14 +103,24 @@ export function MCPReconnect(t0) {
     }
     let t4;
     if ($[8] === Symbol.for("react.memo_cache_sentinel")) {
-      t4 = <Box><Spinner /><Text> Establishing connection to MCP server</Text></Box>;
+      t4 = (
+        <Box flexDirection="row" gap={1}>
+          <Spinner />
+          <Text>Establishing connection to MCP server</Text>
+        </Box>
+      );
       $[8] = t4;
     } else {
       t4 = $[8];
     }
     let t5;
     if ($[9] !== t3) {
-      t5 = <Box flexDirection="column" gap={1} padding={1}>{t3}{t4}</Box>;
+      t5 = (
+        <Box flexDirection="column" gap={1} padding={1}>
+          {t3}
+          {t4}
+        </Box>
+      );
       $[9] = t3;
       $[10] = t5;
     } else {
@@ -136,7 +155,12 @@ export function MCPReconnect(t0) {
     }
     let t6;
     if ($[17] !== t4 || $[18] !== t5) {
-      t6 = <Box>{t4}{t5}</Box>;
+      t6 = (
+        <Box>
+          {t4}
+          {t5}
+        </Box>
+      );
       $[17] = t4;
       $[18] = t5;
       $[19] = t6;
@@ -153,7 +177,12 @@ export function MCPReconnect(t0) {
     }
     let t8;
     if ($[22] !== t6 || $[23] !== t7) {
-      t8 = <Box flexDirection="column" gap={1} padding={1}>{t6}{t7}</Box>;
+      t8 = (
+        <Box flexDirection="column" gap={1} padding={1}>
+          {t6}
+          {t7}
+        </Box>
+      );
       $[22] = t6;
       $[23] = t7;
       $[24] = t8;
